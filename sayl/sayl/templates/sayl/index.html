@@ -1,0 +1,183 @@
+{% extends "sayl/base_site.html" %} {% load static %} {% block title %} Dashboard 1 {% endblock title %} {% block stylesheets %} {{ block.super }} {% endblock stylesheets %} {% block content %}
+<div class="right_col" role="main">
+    <!-- top tiles -->
+    <div class="row tile_count">
+        <div class="col-md-3 col-sm-4 col-xs-6 tile_stats_count">
+            <span class="count_top"><i class="fa fa-user"></i> Horas Trabajadas Semanal</span>
+            <div class="count green">2500</div>
+            <span class="count_bottom"><i class="green">4% </i> From last Week</span>
+        </div>
+        <div class="col-md-3 col-sm-4 col-xs-6 tile_stats_count">
+            <span class="count_top"><i class="fa fa-clock-o"></i> Horas a Favor</span>
+            <div class="count">123.50</div>
+            <span class="count_bottom"><i class="green"><i class="fa fa-sort-asc"></i>3% </i> From last Week</span>
+        </div>
+        <div class="col-md-3 col-sm-4 col-xs-6 tile_stats_count">
+            <span class="count_top"><i class="fa fa-user"></i> Inasistencias Injustificadas</span>
+            <div class="count red">2,500</div>
+            <span class="count_bottom"><i class="green"><i class="fa fa-sort-asc"></i>34% </i> From last Week</span>
+        </div>
+        <div class="col-md-3 col-sm-4 col-xs-6 tile_stats_count">
+            <span class="count_top"><i class="fa fa-user"></i> Inconsistencias de Marcaje</span>
+            <div class="count red">2,500</div>
+            <span class="count_bottom"><i class="green"><i class="fa fa-sort-asc"></i>34% </i> From last Week</span>
+        </div>
+        
+    </div>
+    <!-- /top tiles -->
+    <div class="row">
+    
+    <div class="col col-md-6">ASDASDAS</div>
+    <div class="col col-md-6">
+        <label for="filter_user">Agentes: </label>
+        <select class="select2" id="filter_user">
+            <option value="all">Todos</option>
+            {% for usuario in usuarios  %}
+                <option value="{{usuario.pk}}">{{usuario.last_name}} {{usuario.first_name}}</option>
+            {% endfor %}
+        </select>
+        <label for="filter_user">Fecha: </label>
+        <input type="text" id="daterangepicker">
+        <canvas id="bar-chart" data-url="{% url 'estadistica_estados_marcajes' %}" width="800" height="450"></canvas>
+
+    </div>
+    
+    </div>
+    
+</div>
+
+
+{% endblock content %} {% block javascripts %} {{ block.super}}
+<!-- Chart.js -->
+<script src="/static/vendors/Chart.js/dist/Chart.min.js"></script>
+<script>
+$(function(){
+    miChart = new Chart(document.getElementById("bar-chart"), {
+        type: 'bar',
+        data: {
+            labels: [],
+            datasets: [{
+                label: "Cantidad de Ocurrencias",
+                backgroundColor: [],
+                data: []
+            }]
+        },
+        options: {
+            legend: { display: false },
+            title: {
+                display: true,
+                text: 'Condiciones de Marcajes (cantidad)'
+            },
+            scales: {
+                yAxes: [{
+                    ticks: {
+                        suggestedMin: 0,
+                        suggestedMax: 10,
+                        stepSize: 1
+                    }
+                }]
+            }
+        }
+    });
+    var condiciones_chart = $('#bar-chart');
+    
+    $.ajax({
+        url: condiciones_chart.data('url'),
+        success: function(data){
+            colores_random = []
+            for (let index = 0; index < data.labels.length; index++) {
+                colores_random.push(getRandomColor());
+                
+            }
+            console.log(colores_random);
+            miChart.data.labels = data.labels;
+            miChart.data.datasets[0].data = data['data'];
+            miChart.data.datasets[0].backgroundColor = colores_random;
+            console.log(miChart.data.datasets[0].data);
+            console.log(miChart.data.labels);
+            miChart.update();
+        }
+
+    })
+    $('#daterangepicker').val('')
+    $('#filter_user, #daterangepicker').change(function(){
+        console.log("cambio usuario");
+        user_pk = $('#filter_user').val()
+        fecha_rango = $('#daterangepicker').val()
+        console.log(user_pk)
+        console.log(fecha_rango)
+        var url = condiciones_chart.data('url');
+        
+        $.ajax({
+        url: url,
+        data:{
+            'fechona': fecha_rango,
+            'user_pk': user_pk
+        },
+        success: function(data){
+            colores_random = []
+            for (let index = 0; index < data.labels.length; index++) {
+                colores_random.push(getRandomColor());
+                
+            }
+            console.log(colores_random);
+            miChart.data.labels = data.labels;
+            miChart.data.datasets[0].data = data['data'];
+            miChart.data.datasets[0].backgroundColor = colores_random;
+            console.log(miChart.data.datasets[0].data);
+            console.log(miChart.data.labels);
+            miChart.update();
+        }
+
+    })
+
+    /*$('#daterangepicker').change(function(){
+        console.log("cambio usuario");
+        var fecha = $(this).val();
+        var rango = fecha.split(' - ');
+        if(fecha==''){
+            url = 
+        }else{
+            url = 
+        }
+        
+
+    });*/
+
+    });
+    
+});
+
+function getRandomColor() {
+    var letters = '0123456789ABCDEF'.split('');
+    var color = '#';
+    for (var i = 0; i < 6; i++ ) {
+        color += letters[Math.floor(Math.random() * 16)];
+    }
+    return color;
+}
+</script>
+<!-- gauge.js -->
+<script src="/static/vendors/gauge.js/dist/gauge.min.js"></script>
+<!-- Skycons -->
+<script src="/static/vendors/skycons/skycons.js"></script>
+<!-- Flot -->
+<script src="/static/vendors/Flot/jquery.flot.js"></script>
+<script src="/static/vendors/Flot/jquery.flot.pie.js"></script>
+<script src="/static/vendors/Flot/jquery.flot.time.js"></script>
+<script src="/static/vendors/Flot/jquery.flot.stack.js"></script>
+<script src="/static/vendors/Flot/jquery.flot.resize.js"></script>
+<!-- Flot plugins -->
+<script src="/static/vendors/flot.orderbars/js/jquery.flot.orderBars.js"></script>
+<script src="/static/vendors/flot-spline/js/jquery.flot.spline.min.js"></script>
+<script src="/static/vendors/flot.curvedlines/curvedLines.js"></script>
+<!-- DateJS -->
+<script src="/static/vendors/DateJS/build/date.js"></script>
+<!-- JQVMap -->
+<script src="/static/vendors/jqvmap/dist/jquery.vmap.js"></script>
+<script src="/static/vendors/jqvmap/dist/maps/jquery.vmap.world.js"></script>
+<script src="/static/vendors/jqvmap/examples/js/jquery.vmap.sampledata.js"></script>
+
+
+{% endblock javascripts %}
+
