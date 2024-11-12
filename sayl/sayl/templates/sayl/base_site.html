@@ -59,8 +59,8 @@
         </div>
     </div>
     {% else %}
-    <p>You are not logged in</p>
-    <a href="{% url 'login' %}">login</a> {% endif %} {% block javascripts %}
+    <p>No estas registrado con ninguna cuenta</p>
+    <a href="{% url 'login' %}">Iniciar Sesión</a> {% endif %} {% block javascripts %}
     <!-- jQuery -->
 
     <script src="{% static '/vendors/jquery/dist/jquery.min.js' %}"></script>
