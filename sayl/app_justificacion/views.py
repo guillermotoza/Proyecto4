@@ -37,7 +37,7 @@ def index(request):
         observacion = request.POST.get('observacion')
         justificacion = Justificacion.objects.filter(pk=pk).update(observaciones_supervisor=observacion)
         if "btn-aprobar" in request.POST:
-            print("QUE LE PASAAAA")
+            print("NO SE ACEPTA LA SOLICITUD")
             justificacion = Justificacion.objects.get(pk=pk)
             print(justificacion.fecha_inicio, " - ", justificacion.fecha_fin)
             for single_date in daterange(justificacion.fecha_inicio, justificacion.fecha_fin):
@@ -91,9 +91,9 @@ def avisar_inasistencia(request):
                     dsd = justificacion.fecha_inicio
                     cant_justificaciones = hst - dsd
                     cant_dias_justificaciones += cant_justificaciones.days + 1 #se suma uno porque la diferencia me da un dia menos
-                    print("ASFLKASJFLJ ", cant_dias_justificaciones)
+                    print("CANTIDAD DE DIAS PERMITIDOS ", cant_dias_justificaciones)
                 cant_dias_justificaciones += (just.fecha_fin - just.fecha_inicio).days + 1    
-                print("ASFLKASJFLJ x2 ", cant_dias_justificaciones)
+                print("CANTIDAD DE DIAS PERMITIDOS ", cant_dias_justificaciones)
                 #Pregunta si la cantidad que pidio no supera el limite.
                 print("Cant al año permitidas: ", just.tipo_justificacion.cant_año)
                 print("cant que hay: ", cant_dias_justificaciones)
@@ -109,7 +109,7 @@ def avisar_inasistencia(request):
 
                     mensaje = request.user.first_name + " "
                     mensaje += request.user.last_name
-                    mensaje += " ha notificado que se ausentara por: " + motivo           
+                    mensaje += " Ha notificado que se ausentara por: " + motivo           
                     
                     mensaje += " desde: " + desde
                     mensaje += " hasta: " + hasta
@@ -117,7 +117,7 @@ def avisar_inasistencia(request):
                     if request.user.suscripto_telefono:             
                         mandar_whatsapp(avisar_a, mensaje)
                     if request.user.suscripto_mail:
-                        print("Sus mail")
+                        print("Sus Mails")
                         mandar_mail(avisar_a, "Sobre Aviso de Inasistencia", mensaje)
                     just.save()
                 else:
@@ -145,7 +145,7 @@ def cancelar_aviso(request, pk):
     return redirect('/app_justificacion/avisar_inasistencia')
 
 def aprobar_just(request, pk):
-    print("QUE LE PASAAAA")
+    print("NO SE ACEPTA LA SOLICITUD")
     justificacion = Justificacion.objects.filter(pk=pk)
     print(justificacion.fecha_inicio, " - ", justificacion.fecha_fin)
     for single_date in daterange(justificacion.fecha_inicio, justificacion.fecha_fin):

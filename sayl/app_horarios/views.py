@@ -13,88 +13,86 @@ from login.models import CustomUser
 from config.models import Configuraciones
 from cargos.models import CargosCache
 from sayl.utils import time2timedelta
+from django.shortcuts import render, get_object_or_404
+from django.core.exceptions import ObjectDoesNotExist
+import logging
 
 # Create your views here.
 
+logger = logging.getLogger(__name__)
+
 def index(request):
-
-    cargo_actual = CargosCache.objects.get(customuser=request.user, seleccionado=True)   
-    config = Configuraciones.objects.filter().order_by('-id')[0]
-    d_horarios = DetalleHorario.objects.filter(horario__legajo=request.user, horario__cargo=cargo_actual)
-    form_detalle_horario = DetalleHorarioForm()
-    print(cargo_actual)
-    h = Horario.objects.filter(legajo=request.user, cargo=cargo_actual)
-    
-    horas_semanales = get_cargos_api(request.user)
-    
-    horas_semanales = horas_semanales[0]['horas_dedicacion']
-    #gregar porcentaje frente al aula.
-    
-    #Obtenemos las horas semanales que tiene que cumplir el cargo actual
-    
-    print(cargo_actual.horas_dedicacion)
-
-
-    if request.method == 'POST': 
-        form_detalle_horario = DetalleHorarioForm(request.POST)   
-        print("Error: ", form_detalle_horario.errors)    
-        if form_detalle_horario.is_valid():    
-            if h.count() > 0:
-                print("Existe")
-                desde = form_detalle_horario.cleaned_data['desde'] 
-                hasta = form_detalle_horario.cleaned_data['hasta']            
-                dia = form_detalle_horario.cleaned_data['dia']            
-                horario = Horario.objects.get(legajo=request.user,cargo=cargo_actual)
-                
-                print(type(hasta))
-                #hasta = hasta - timedelta(minutes=1)
-                #desde = desde + timedelta(minutes=1)
-                print("Horarios fijos: ", HorariosFijos.objects.filter(hora_entrada__lte=hasta, hora_salida__gte=desde, agente=request.user))
-                if (DetalleHorario.objects.filter(desde__lte=hasta, hasta__gte=desde, dia=dia, horario__legajo=request.user).exists()
-                    or HorariosFijos.objects.filter(hora_entrada__lte=hasta, hora_salida__gte=desde, agente=request.user).exists()):
-                    messages.error(request, 'Ya existe este horario establecido. Revise los horarios de sus otros cargos')
+    try:
+        cargo_actual = get_object_or_404(CargosCache, customuser=request.user, seleccionado=True)
+        config = Configuraciones.objects.latest('id')
+        d_horarios = DetalleHorario.objects.filter(horario__legajo=request.user, horario__cargo=cargo_actual).select_related('horario')
+        form_detalle_horario = DetalleHorarioForm()
+        h = Horario.objects.filter(legajo=request.user, cargo=cargo_actual).select_related('cargo')
+        
+        horas_semanales = get_cargos_api(request.user)
+        horas_dedicacion = horas_semanales[0]['horas_dedicacion']
+        
+        logger.info(f'Cargo actual: {cargo_actual}')
+        logger.info(f'Horas de dedicación: {cargo_actual.horas_dedicacion}')
+        
+        if request.method == 'POST':
+            form_detalle_horario = DetalleHorarioForm(request.POST)
+            logger.error(f"Error: {form_detalle_horario.errors}")
+            if form_detalle_horario.is_valid():
+                if h.exists():
+                    logger.info("Existe")
+                    desde = form_detalle_horario.cleaned_data['desde']
+                    hasta = form_detalle_horario.cleaned_data['hasta']
+                    dia = form_detalle_horario.cleaned_data['dia']
+                    horario = h.first()
+                    
+                    if (DetalleHorario.objects.filter(desde__lte=hasta, hasta__gte=desde, dia=dia, horario__legajo=request.user).exists() or
+                        HorariosFijos.objects.filter(hora_entrada__lte=hasta, hora_salida__gte=desde, agente=request.user).exists()):
+                        messages.error(request, 'Ya existe este horario establecido. Revise los horarios de sus otros cargos')
+                    else:
+                        detalle_horario = form_detalle_horario.save(commit=False)
+                        detalle_horario.horario = horario
+                        detalle_horario.save()
                 else:
-                                        
+                    logger.info("No existe")
+                    edificio = get_object_or_404(Edificio, pk=1)
+                    periodo_lectivo = get_object_or_404(PeriodoLectivo, pk=1)
+                    horario = Horario(edificio=edificio, periodo_lectivo=periodo_lectivo, legajo=request.user, cant_modificaciones=2, cargo=cargo_actual)
+                    horario.save()
                     detalle_horario = form_detalle_horario.save(commit=False)
                     detalle_horario.horario = horario
                     detalle_horario.save()
             else:
-                print("No existe")
-                edificio = Edificio.objects.get(pk=1)
-                periodo_lectivo = PeriodoLectivo.objects.get(pk=1)
-                horario = Horario(edificio=edificio,periodo_lectivo=periodo_lectivo,legajo=request.user, cant_modificaciones=2, cargo=cargo_actual) #SETTINGS -> Parametrizar cant_modif
-                horario.save()
-                print(horario)
-                detalle_horario = form_detalle_horario.save(commit=False)
-                detalle_horario.horario = horario
-                detalle_horario.save()          
-    else:
-        horario = Horario.objects.get(legajo=request.user, cargo=cargo_actual) if h.count() > 0 else None
+                logger.error(f"Formulario inválido: {form_detalle_horario.errors}")
+        else:
+            horario = h.first() if h.exists() else None
 
-    horas_declaradas = DetalleHorario.objects.select_related('horario').filter(horario=horario)
-    total_declarado = timedelta()
-    for hora_declarada in horas_declaradas:
-        dsd = time2timedelta(hora_declarada.desde)
-        hst = time2timedelta(hora_declarada.hasta)
-        total_declarado += hst - dsd
+        horas_declaradas = DetalleHorario.objects.select_related('horario').filter(horario=horario)
+        total_declarado = timedelta()
+        for hora_declarada in horas_declaradas:
+            dsd = time2timedelta(hora_declarada.desde)
+            hst = time2timedelta(hora_declarada.hasta)
+            total_declarado += hst - dsd
+        
+        total_declarado = total_declarado.total_seconds() / 3600  # Convertir a horas
+        porcentaje_frente_aula = config.porcentaje_frente_aula / 100
+        horas_dedicacion = round(cargo_actual.horas_dedicacion * porcentaje_frente_aula)
+        
+        context = {
+            'horario': horario,
+            'd_horarios': d_horarios,
+            'form_detalle_horario': form_detalle_horario,
+            'porcentaje_horas': None,
+            'horas_dedicacion': horas_dedicacion,
+            'declarado_actual': total_declarado,
+            'config': config
+        }
+        
+        return render(request, 'app_horarios/index.html', context)
     
-    total_declarado = '%02d.%02d' % (total_declarado.days*24 + total_declarado.seconds // 3600, ((total_declarado.seconds % 3600) // 60) + (total_declarado.seconds % 60) + total_declarado.microseconds)
-    total_declarado = float(total_declarado)
-    
-    #total_declarado = float(total_declarado.replace(":",".",2))
-    print("Total declarado: ", total_declarado)
-    porcentaje_frente_aula = (config.porcentaje_frente_aula / 100)
-    print("porcentaje", config.porcentaje_frente_aula)
-    #Pasamos el timedelta a float
-    secs=total_declarado.seconds #timedelta has everything below the day level stored in seconds
-    minutes = ((secs/60)%60)/60.0
-    hours = secs/3600
-    total_declarado = hours + minutes
-    print("Total declarado: ", total_declarado)
-    porcentaje_horas = None
-    horas_dedicacion =  round(cargo_actual.horas_dedicacion * porcentaje_frente_aula)
-    return render(request, 'app_horarios/index.html', {'horario':horario, 'd_horarios':d_horarios, 'form_detalle_horario':form_detalle_horario, 'porcentaje_horas':porcentaje_horas, 'horas_dedicacion':horas_dedicacion, 'declarado_actual':total_declarado, 'config':config})
-    
+    except ObjectDoesNotExist as e:
+        logger.error(f'Error: {e}')
+        return render(request, 'error.html', {'message': 'Error al obtener los datos.'})
 
 
 # def modificar_detalle_horario(request, pk):
